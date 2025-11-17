@@ -1,0 +1,92 @@
+version: "1.0"
+timeframe:
+  start_year: 2020
+  end_year: 2025
+jurisdictions:
+  # "ALL" in the collector means the full list below
+  list: ["AL","AK","AZ","AR","CA","CO","CT","DC","DE","FL","GA","HI","IA","ID","IL","IN","KS","KY","LA","MA","MD","ME","MI","MN","MO","MS","MT","NC","ND","NE","NH","NJ","NM","NV","NY","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VA","VT","WA","WI","WV","WY"]
+
+bill_type_policy:
+  exclude_type_ids: [2,3,4,5,8,10,12,13,14,15,16]   # resolutions & memorials, etc.
+  include_others: true                               # keep everything else (including CA, EO, initiatives, study bills)
+
+dedup:
+  key: ["bill_id","change_hash"]
+  cross_pass_strategy: "prefer_newer_status_date_then_newer_change_hash"
+
+# Keywords by domain
+# School nutrition: | 
+#   (("school meal" OR "school meals") OR "school nutrition" OR ("school lunch" OR "school lunches") OR ("school breakfast" OR "school breakfasts")
+#   OR ("school food" OR "school foods") OR cafeteria OR snack OR ("processed food" OR "processed foods") OR "school physical education")
+# Food access and assistance: |
+#   ("food desert" OR (farmers NEAR market) OR "food access")
+#   OR ((SNAP nutrition) OR ("nutrition incentive" OR "nutrition incentives") OR (WIC nutrition) OR "nutrition assistance")
+# Food and beverage taxes and incentives: |
+#   ("soda tax" OR ((sweetened OR sugary) beverages) OR "beverage tax")
+# Farms and Gardens: "farm to school"
+# Food labeling and marketing: |
+#   ("food labeling" OR "menu labeling" OR "food marketing" OR "food advertising" OR (food ADJ packaging) OR (food ADJ dyes) OR (food ADJ additives))
+# Built environment and physical activity: |
+#   ("active living" AND nutrition)
+# Obesity general: |
+#   ("obesity prevention" OR "food standards" OR "weight loss" OR "healthy eating")
+
+# # ! extra
+# Healthcare nutrition: |
+#   "medical nutrition therapy" OR "nutrition counseling" OR "obesity treatment"
+# Institutional Food environments: | 
+#   "healthy eating" OR "healthy food" OR "healthy vending"
+  
+
+bundles:
+  - id: "q1"
+    description: "Query 1 includes school nutrition, food access, and nutrition assistance"
+    query: | 
+      (("school meal" OR "school meals") OR "school nutrition" OR ("school lunch" OR "school lunches") OR ("school breakfast" OR "school breakfasts")
+      OR ("school food" OR "school foods") OR cafeteria OR snack OR ("processed food" OR "processed foods") OR "school physical education")
+      OR ("food desert" OR (farmers NEAR market) OR "food access")
+      OR ((SNAP nutrition) OR ("nutrition incentive" OR "nutrition incentives") OR (WIC nutrition) OR "nutrition assistance")
+  - id: "q2"
+    description: "Query 2 includes soda tax, farm to school, food labeling, and active living"
+    query: |
+      ("soda tax" OR ((sweetened OR sugary) beverages) OR "beverage tax")
+      OR "farm to school"
+      OR ("food labeling" OR "menu labeling" OR "food marketing" OR "food advertising" OR (food ADJ packaging) OR (food ADJ dyes) OR (food ADJ additives))
+      OR ("active living" AND nutrition)
+  - id: "q3"
+    description: "Query 3 includes obesity prevention, food standards, weight loss, healthy eating, medical nutrition therapy, nutrition counseling, and obesity treatment"
+    query: |
+      ("obesity prevention" OR "food standards" OR "weight loss" OR "healthy eating")
+      OR "medical nutrition therapy" OR "nutrition counseling" OR "obesity treatment"
+      OR "healthy eating" OR "healthy food" OR "healthy vending"
+
+
+execution:
+  rate_limit:
+    sleep_seconds_between_calls: 0.3
+  paging:
+    page_size_hint: 2000  # server-side; just document expectation
+  file_naming: "{date}_{bundleId}_{state}_{year}.ndjson"
+  header_block: true  # collector writes the `_meta` record as first line
+  logging:
+    jsonl_log: true
+    include_params: ["op","state","year","page","query"]
+    include_timestamps: true
+    include_errors: true
+
+parser_output:
+  # matches your final schema
+  format: "ndjson_and_csv"
+  fields:
+    required: ["id","number","state","text_url","summary","type","document_url","filed_date","author","cycle","status","status_date","pro","outcome","status_code","category_environment","topic"]
+    optional: ["research_url","sponsor_party","sponsors","subjects","session_name","session_year_start","session_year_end","last_action","last_action_date","change_hash","text_doc_ids"]
+  outcome_rules:
+    passed: [4]
+    failed: [5,6]
+    pending: "any other status"
+  text_url_choice: "newest_texts_url_else_text_url"
+
+notes:
+  - "Collector only saves the raw results per pass; parser reads those files and emits normalized records."
+  - "Do not exclude non-bill types except resolution classes listed above."
+  - "Subjects should capture subject_name strings; useful for coder hints."

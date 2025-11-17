@@ -1,0 +1,13 @@
+
+# docs
+docs/
+
+# excel files
+*.xlsx
+*.xls
+
+# csv files
+*.csv
+
+# data output
+data/

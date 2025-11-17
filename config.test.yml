@@ -1,0 +1,18 @@
+version: "1.0"
+timeframe:
+  start_year: 2024
+  end_year: 2024
+jurisdictions:
+  list: ["MA"]   # keep it tiny for a smoke test
+bill_type_policy:
+  exclude_type_ids: [2,3,4,5,8,10,12,13,14,15,16]
+bundles:
+  - id: "school"
+    description: "School nutrition & wellness"
+    query: |
+      ("school meals" OR "school nutrition" OR "school lunch" OR "school breakfast"
+       OR "competitive foods" OR "vending machines" OR "nutrition standards"
+       OR "nutrition education" OR "school wellness" OR "farm to school" OR "farm-to-school" OR "school recess")
+execution:
+  file_naming: "{date}_{bundleId}_{state}_{year}.ndjson"
+  header_block: true
