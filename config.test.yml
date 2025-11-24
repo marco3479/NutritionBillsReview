@@ -3,16 +3,48 @@ timeframe:
   start_year: 2024
   end_year: 2024
 jurisdictions:
-  list: ["MA"]   # keep it tiny for a smoke test
+  # keep the smoke test tiny, but mirror the prod structure
+  list: ["MA"]
+
 bill_type_policy:
   exclude_type_ids: [2,3,4,5,8,10,12,13,14,15,16]
+  include_others: true
+
+dedup:
+  key: ["bill_id","change_hash"]
+  cross_pass_strategy: "prefer_newer_status_date_then_newer_change_hash"
+
 bundles:
-  - id: "school"
-    description: "School nutrition & wellness"
+  - id: "q1"
+    description: "Query 1 condensed for smoke tests"
     query: |
-      ("school meals" OR "school nutrition" OR "school lunch" OR "school breakfast"
-       OR "competitive foods" OR "vending machines" OR "nutrition standards"
-       OR "nutrition education" OR "school wellness" OR "farm to school" OR "farm-to-school" OR "school recess")
+      ("school meal" OR "school nutrition")
+      OR ("food desert" OR "food access")
+      OR ("nutrition incentive" OR "nutrition assistance")
+
 execution:
+  rate_limit:
+    sleep_seconds_between_calls: 0.1
+  paging:
+    page_size_hint: 2000
   file_naming: "{date}_{bundleId}_{state}_{year}.ndjson"
   header_block: true
+  logging:
+    jsonl_log: true
+    include_params: ["op","state","year","page","query"]
+    include_timestamps: true
+    include_errors: true
+
+parser_output:
+  format: "ndjson_and_csv"
+  fields:
+    required: ["id","number","state","text_url","summary","type","document_url","filed_date","author","cycle","status","status_date","pro","outcome","status_code","category_environment","topic"]
+    optional: ["research_url","sponsor_party","sponsors","subjects","session_name","session_year_start","session_year_end","last_action","last_action_date","change_hash","text_doc_ids"]
+  outcome_rules:
+    passed: [4]
+    failed: [5,6]
+    pending: "any other status"
+  text_url_choice: "newest_texts_url_else_text_url"
+
+notes:
+  - "Smoke test config mirrors production options but scoped to MA 2024."

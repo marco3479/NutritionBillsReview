@@ -11,3 +11,7 @@ docs/
 
 # data output
 data/
+
+
+# private commands with API keys
+commands.md

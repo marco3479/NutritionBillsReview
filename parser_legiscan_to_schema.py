@@ -15,6 +15,33 @@ import argparse, csv, glob, json, sys
 from pathlib import Path
 from typing import Dict, Any, List, Tuple
 
+MAX_CELL_CHARS = 30000
+
+def _truncate(value: Any, field_name: str) -> Any:
+    if value is None:
+        return value
+    if isinstance(value, str):
+        if len(value) > MAX_CELL_CHARS:
+            print(
+                f"[warn] truncating field '{field_name}' from {len(value)} to {MAX_CELL_CHARS} characters",
+                file=sys.stderr,
+            )
+            return value[:MAX_CELL_CHARS]
+        return value
+    if isinstance(value, list):
+        truncated = []
+        for item in value:
+            if isinstance(item, str) and len(item) > MAX_CELL_CHARS:
+                print(
+                    f"[warn] truncating item in field '{field_name}' from {len(item)} to {MAX_CELL_CHARS} characters",
+                    file=sys.stderr,
+                )
+                truncated.append(item[:MAX_CELL_CHARS])
+            else:
+                truncated.append(item)
+        return truncated
+    return value
+
 try:
     import yaml
     HAS_YAML = True
@@ -124,7 +151,7 @@ def to_schema(bill_payload: Dict[str, Any]) -> Dict[str, Any]:
         "number": b.get("number") or b.get("bill_number"),
         "state": b.get("state"),
         "text_url": newest_text_url(b),
-        "summary": b.get("description") or b.get("title"),
+        "summary": _truncate(b.get("description") or b.get("title"), "summary"),
         "type": bill_type_label,
         "document_url": b.get("url"),
         "filed_date": earliest_history_date(b),
@@ -138,13 +165,9 @@ def to_schema(bill_payload: Dict[str, Any]) -> Dict[str, Any]:
         "status": status_txt,
         "status_date": status_date,
 
-        "session_name": sess.get("session_name"),
-        "session_year_start": sess.get("year_start"),
-        "session_year_end": sess.get("year_end"),
-        "last_action": last_action,
+        "last_action": _truncate(last_action, "last_action"),
         "last_action_date": last_action_date,
         "change_hash": b.get("change_hash"),
-        "text_doc_ids": [t.get("doc_id") for t in (b.get("texts") or []) if t.get("doc_id") is not None],
 
         # POLICY CLASSIFICATION (manual later)
         "pro": None,
@@ -253,8 +276,8 @@ def main():
         # BILL INFO
         "id","number","state","text_url","summary","type","document_url",
         "filed_date","author","sponsor_party","sponsors","subjects","cycle","status","status_date",
-        "session_name","session_year_start","session_year_end","last_action","last_action_date",
-        "change_hash","text_doc_ids",
+        "last_action","last_action_date",
+        "change_hash",
         # POLICY CLASSIFICATION
         "pro","outcome","status_code","category_environment","topic"
     ]
@@ -294,6 +317,10 @@ def main():
         print("  kept by type:")
         for bt_id in sorted(kept_by_type.keys()):
             print(f"    - {bt_id:>2} {_label(bt_id):<40} : {kept_by_type[bt_id]}")
+
+    dedup_dropped = max(0, kept_total - len(best))
+    print(f"\n[dedupe] unique bills after cross-pass dedup: {len(best)}")
+    print(f"[dedupe] duplicate entries removed post-type-filter: {dedup_dropped}")
 
 
     # Build a serializable report dict

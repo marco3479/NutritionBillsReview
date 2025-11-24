@@ -30,12 +30,10 @@ dedup:
 #   ("active living" AND nutrition)
 # Obesity general: |
 #   ("obesity prevention" OR "food standards" OR "weight loss" OR "healthy eating")
-
-# # ! extra
 # Healthcare nutrition: |
-#   "medical nutrition therapy" OR "nutrition counseling" OR "obesity treatment"
+#   "nutrition counseling" OR "obesity treatment"
 # Institutional Food environments: | 
-#   "healthy eating" OR "healthy food" OR "healthy vending"
+#   "healthy food" OR "healthy vending"
   
 
 bundles:
@@ -56,9 +54,9 @@ bundles:
   - id: "q3"
     description: "Query 3 includes obesity prevention, food standards, weight loss, healthy eating, medical nutrition therapy, nutrition counseling, and obesity treatment"
     query: |
-      ("obesity prevention" OR "food standards" OR "weight loss" OR "healthy eating")
-      OR "medical nutrition therapy" OR "nutrition counseling" OR "obesity treatment"
-      OR "healthy eating" OR "healthy food" OR "healthy vending"
+      ("obesity prevention" OR "food standards" OR ("weight loss" AND nutrition) OR "healthy eating")
+      OR "nutrition counseling" OR "obesity treatment"
+      OR "healthy food" OR "healthy vending"
 
 
 execution:
