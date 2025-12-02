@@ -2,12 +2,13 @@
 
 ## Overview
 
-This repository automates the collection, normalization, and policy classification of U.S. nutrition and obesity‑related legislation. It has three stages:
+This repository automates the collection, normalization, and policy classification of U.S. nutrition and obesity‑related legislation. It has the following stages:
 
 1. **Collector (`collector_legiscan.py`)** – queries the LegiScan API, walks through result pages, and saves the raw `getBill` payloads (one JSON per line) for later processing.  
 2. **Parser (`parser_legiscan_to_schema.py`)** – turns the raw payloads into your working schema (NDJSON + CSV), deduping across passes and applying your bill‑type rules.  
-3. **Keyword pre-screen (`filterRelatedToNutrition.py`)** – quickly annotates each summary with a binary `related` flag via keyword/regex matching.  
-4. **Classifier (`classify.py`)** – calls the OpenAI Responses API to label each bill with nutrition relevance, directionality, environment, and topic.
+3. **SAST annotator (`annotate_sasts_relationships.py`)** – enriches the parser workbook with LegiScan “same-as” / “crossfiled” relationships drawn from the parsed NDJSON.  
+4. **Keyword pre-screen (`filterRelatedToNutrition.py`)** – quickly annotates each summary with a binary `related` flag via keyword/regex matching.  
+5. **Classifier (`classify.py`)** – calls the OpenAI Responses API to label each bill with nutrition relevance, directionality, environment, and topic.
 
 The workflow is intentionally lightweight: configure once, run the collector whenever you want fresh data, then re-run the parser to regenerate normalized outputs.
 
@@ -115,6 +116,25 @@ python parser_legiscan_to_schema.py \
 
 ---
 
+## SAST Relationship Annotation
+
+```
+python annotate_sasts_relationships.py \
+    --ndjson data/parsed/bills.ndjson \
+    --workbook data/parsed/NutritionBillsReview.xlsx \
+    --sheet Bills \
+    --sameas-column sameAs \
+    --crossfiled-column crossfiled
+```
+
+### What the annotator does
+
+- Reads the normalized NDJSON produced by `parser_legiscan_to_schema.py` and collects LegiScan SAST relationships.
+- Writes JSON arrays of bill numbers (and LegiScan IDs when present) into `sameAs` and `crossfiled` columns on the target worksheet.
+- Creates the columns when they do not already exist and can overwrite in place or write to a new workbook via `--output`.
+
+---
+
 ## Classifier Usage
 
 ```
@@ -166,16 +186,21 @@ python classify.py \
    python collector_legiscan.py --api_key ... --config config.yml --outdir data/raw --sleep 0.4 --state_scope all
    python parser_legiscan_to_schema.py --inputs "data/raw/*.ndjson" --config config.yml --out_ndjson data/parsed/bills.ndjson --out_csv data/parsed/bills.csv
    ```
-3. **Keyword pass** (optional but recommended before LLM classification):
+3. **Annotate SAST relationships** (optional but recommended before sharing workbook):
+   ```bash
+   python annotate_sasts_relationships.py --ndjson data/parsed/bills.ndjson --workbook data/parsed/NutritionBillsReview.xlsx --sheet Bills
+   ```
+   Populates `sameAs` / `crossfiled` columns so reviewers can see cross-chamber pairings at a glance.
+4. **Keyword pass** (optional but recommended before LLM classification):
    ```bash
    python filterRelatedToNutrition.py data/parsed/NutritionBillsReview.xlsx --sheet Edit3
    ```
    Adds/overwrites a `related` column based on summary keyword hits, giving you a quick sanity check and a baseline flag.  
-4. **LLM classification**:
+5. **LLM classification**:
    ```bash
    python classify.py data/parsed/NutritionBillsReview.xlsx --sheet Edit3 --max-batch-kb 40 --max-output-tokens 5000
    ```
-5. **Reruns** are safe – cached records dedupe automatically. Delete or move the NDJSON output if you want a full refetch.
+6. **Reruns** are safe – cached records dedupe automatically. Delete or move the NDJSON output if you want a full refetch.
 
 ---
 
@@ -193,6 +218,7 @@ python classify.py \
 ```
 collector_legiscan.py        # data ingestion from LegiScan API
 parser_legiscan_to_schema.py # normalization & schema output
+annotate_sasts_relationships.py # workbook enrichment with SAST links
 config.yml                   # production configuration
 config.test.yml              # smoke-test configuration
 commands.md                  # quick command references

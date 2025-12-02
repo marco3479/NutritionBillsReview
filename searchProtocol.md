@@ -17,8 +17,9 @@
 ## Run Structure
 1. **Collector (`collector_legiscan.py`)** – executes one pass per bundle and state/year (or the national index when `--state_scope all` is set), writing a single NDJSON file per pass.  
 2. **Parser (`parser_legiscan_to_schema.py`)** – reads those NDJSON files, dedupes across passes, and emits your normalized schema.  
-3. **Keyword pre-screen (`filterRelatedToNutrition.py`)** – annotates summaries with a fast binary `related` flag via keyword matching.  
-4. **Classifier (`classify.py`)** – batches normalized rows to the OpenAI Responses API and writes the nutrition-policy labels back into the workbook.
+3. **SAST annotator (`annotate_sasts_relationships.py`)** – hydrates the parser-generated workbook with LegiScan “same-as” (`sameAs`) and “crossfiled” (`crossfiled`) columns sourced from the parsed NDJSON.  
+4. **Keyword pre-screen (`filterRelatedToNutrition.py`)** – annotates summaries with a fast binary `related` flag via keyword matching.  
+5. **Classifier (`classify.py`)** – batches normalized rows to the OpenAI Responses API and writes the nutrition-policy labels back into the workbook.
 
 ## File Strategy
 - File naming: `{date}_{bundleId}_{state}_{year}.ndjson` (one per pass).  
@@ -81,6 +82,12 @@
   - Populate contextual fields (`session_*`, `last_action`, `sponsors`, `subjects`, etc.).  
   - Leave coder fields (`pro`, `category_environment`, `topic`, `status_code`) as `null`.  
   - Set `outcome` to `"passed"` or `"failed"` once terminal; otherwise leave `null`.
+
+## SAST Relationship Annotation
+- Input: parser NDJSON (`data/parsed/bills.ndjson`) plus the Excel workbook emitted by the parser.  
+- Output: in-place (or optional new) workbook columns named `sameAs` and `crossfiled`, each containing JSON arrays of related bill numbers / IDs.  
+- Matching: rows are linked via the `id` column by default; override with `--id-column` when the sheet header differs.  
+- Empty relationships are cleared so downstream analysts can rely on the columns without additional cleaning.
 
 ## Quality Control
 - Manually review a random 5–10 % sample against authoritative state links (`research_url`) to verify number, title, status, and dates.

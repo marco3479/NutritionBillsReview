@@ -169,6 +169,8 @@ def to_schema(bill_payload: Dict[str, Any]) -> Dict[str, Any]:
         "last_action_date": last_action_date,
         "change_hash": b.get("change_hash"),
 
+        "sasts": b.get("sasts"),
+
         # POLICY CLASSIFICATION (manual later)
         "pro": None,
         "outcome": outcome,
